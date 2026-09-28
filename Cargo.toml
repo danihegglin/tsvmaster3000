@@ -1,0 +1,27 @@
+[package]
+name = "tsv"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+gpui = "0.2.2"
+memchr = "2.8.3"
+regex = "1.13.1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[features]
+# Compile gpui's Metal shaders at startup, so building doesn't need Xcode's
+# Metal toolchain. Build with --no-default-features to precompile them.
+default = ["runtime-shaders"]
+runtime-shaders = ["gpui/runtime_shaders"]
+
+[dev-dependencies]
+gpui = { version = "0.2.2", features = ["test-support"] }

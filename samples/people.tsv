@@ -1,0 +1,202 @@
+id	name	city	age	balance	status	joined	notes	
+1	carol	Oslo	26	25506.90	inactive	2026-08-16	n/a	
+2	dave	Berlin	80	2834.75	inactive	2026-07-20		
+3	oscar	Toronto	52	72154.00	active	2026-10-04	new customer, referred by a friend	
+4	alice	Zürich	21	64954.61	active	2026-07-22	vip	
+5	grace	Zürich	85	22169.17	inactive	2026-08-18	vip	
+6	frank	New York	46	76094.77	inactive	2026-01-14		
+7	carol	São Paulo	33	74314.67	pending	2026-12-17	n/a	
+8	ivan	New York	56	28415.94	inactive	2026-09-13		
+9	heidi	New York	69	41431.40	active	2026-06-18	new customer, referred by a friend	
+10	bob	Toronto	83	10793.13	active	2026-09-27	n/a	
+11	frank	Toronto	21	46932.01	inactive	2026-12-28	n/a	
+12	mallory	Tokyo	39	50223.86	active	2026-04-18	vip	
+13	grace	Paris	62	95246.74	pending	2026-06-15	new customer, referred by a friend	
+14	mallory	Paris	18	38368.96	pending	2026-09-26	vip	
+15	ivan	Paris	44	42609.07	active	2026-08-28	new customer, referred by a friend	
+16	judy	Paris	43	94101.35	inactive	2026-08-27	new customer, referred by a friend	
+17	grace	Lagos	18	53847.88	pending	2026-10-11	n/a	
+18	judy	Zürich	47	63537.11	pending	2026-10-06		
+19	ivan	São Paulo	22	84174.48	pending	2026-02-03		
+20	heidi	Zürich	53	24955.92	active	2026-10-06	new customer, referred by a friend	
+21	eve	Berlin	39	15962.55	pending	2026-03-22	new customer, referred by a friend	
+22	mallory	São Paulo	76	70262.56	inactive	2026-08-04		
+23	eve	Sydney	61	42091.87	active	2026-05-04	new customer, referred by a friend	
+24	oscar	Paris	44	96556.35	inactive	2026-01-08		
+25	grace	Tokyo	22	71883.55	active	2026-08-23	n/a	
+26	ivan	New York	84	45084.50	pending	2026-11-01	n/a	
+27	mallory	Oslo	59	65982.39	inactive	2026-01-24	new customer, referred by a friend	
+28	carol	New York	24	30638.66	active	2026-05-10	vip	
+29	grace	Oslo	50	13039.11	pending	2026-01-19	vip	
+30	judy	Toronto	39	82791.32	pending	2026-10-17		
+31	grace	New York	62	9902.54	pending	2026-11-14	vip	
+32	heidi	Berlin	67	29607.27	inactive	2026-01-11	n/a	
+33	eve	Zürich	38	20085.30	inactive	2026-10-26	vip	
+34	frank	Sydney	45	26653.55	active	2026-07-18	new customer, referred by a friend	
+35	mallory	Paris	80	76795.12	pending	2026-04-03		
+36	bob	Tokyo	39	16655.26	pending	2026-04-09	new customer, referred by a friend	
+37	judy	Paris	50	36810.80	inactive	2026-02-10	vip	
+38	judy	Toronto	35	57995.71	active	2026-06-02	n/a	
+39	bob	Sydney	36	82850.60	inactive	2026-02-20	n/a	
+40	bob	Oslo	88	22371.41	active	2026-05-12	new customer, referred by a friend	
+41	judy	Paris	32	45776.93	inactive	2026-02-26		
+42	eve	Zürich	19	9168.31	active	2026-01-07	vip	
+43	judy	Sydney	38	11555.82	active	2026-11-08	vip	
+44	oscar	Berlin	73	91076.44	inactive	2026-09-27	new customer, referred by a friend	
+45	ivan	São Paulo	79	31445.97	active	2026-11-11		
+46	alice	Zürich	55	72648.37	inactive	2026-08-13	new customer, referred by a friend	
+47	grace	Berlin	26	91339.20	pending	2026-08-04	new customer, referred by a friend	
+48	dave	Oslo	87	86761.38	inactive	2026-11-12	new customer, referred by a friend	
+49	carol	Paris	44	30732.11	active	2026-06-03	new customer, referred by a friend	
+50	bob	Toronto	29	65201.05	pending	2026-06-08	n/a	
+51	eve	Zürich	59	18681.29	pending	2026-05-08	new customer, referred by a friend	
+52	bob	Paris	29	24509.80	active	2026-04-13		
+53	eve	Paris	27	72916.93	active	2026-11-01	new customer, referred by a friend	
+54	frank	Toronto	78	86264.90	active	2026-02-17	new customer, referred by a friend	
+55	bob	Paris	40	17956.64	active	2026-03-27	new customer, referred by a friend	
+56	eve	Berlin	83	83468.92	pending	2026-05-05	vip	
+57	carol	Paris	22	77974.35	pending	2026-11-18	vip	
+58	carol	São Paulo	73	53749.23	active	2026-12-28	vip	
+59	eve	Berlin	75	80825.26	pending	2026-05-18	n/a	
+60	ivan	Toronto	19	39571.04	inactive	2026-03-09	n/a	
+61	alice	Sydney	20	6232.16	inactive	2026-10-05	vip	
+62	carol	São Paulo	53	39779.73	inactive	2026-03-20		
+63	dave	Toronto	18	17757.81	inactive	2026-09-21	n/a	
+64	mallory	New York	48	31298.49	pending	2026-08-08	n/a	
+65	frank	Paris	53	97235.38	active	2026-01-03	new customer, referred by a friend	
+66	carol	Paris	44	31180.20	pending	2026-05-28	new customer, referred by a friend	
+67	carol	Toronto	28	85627.71	pending	2026-09-19	n/a	
+68	carol	Tokyo	50	42675.29	pending	2026-12-25		
+69	heidi	Sydney	62	38397.67	active	2026-09-24		
+70	ivan	Berlin	50	62844.85	inactive	2026-12-03	vip	
+71	judy	Berlin	74	85097.04	active	2026-07-26	n/a	
+72	grace	Tokyo	59	43812.89	pending	2026-08-07		
+73	grace	Oslo	86	40822.41	active	2026-11-10	new customer, referred by a friend	
+74	dave	Sydney	89	400.90	active	2026-09-15		
+75	alice	Oslo	49	83533.24	active	2026-03-10	vip	
+76	ivan	New York	52	31113.57	inactive	2026-11-15	vip	
+77	ivan	Lagos	80	41996.65	active	2026-04-19	n/a	
+78	dave	São Paulo	31	90401.78	active	2026-02-19		
+79	ivan	São Paulo	35	7518.36	inactive	2026-10-26	new customer, referred by a friend	
+80	grace	Paris	63	75861.02	inactive	2026-01-04	n/a	
+81	oscar	Toronto	62	30479.92	inactive	2026-06-26	n/a	
+82	bob	Sydney	66	20391.41	active	2026-05-21	vip	
+83	heidi	Oslo	84	40896.53	pending	2026-12-10	vip	
+84	heidi	Oslo	85	19736.11	pending	2026-01-22	n/a	
+85	judy	Sydney	69	33601.02	pending	2026-10-24		
+86	heidi	New York	55	62967.54	inactive	2026-12-21	vip	
+87	mallory	Sydney	52	84626.81	active	2026-10-01	new customer, referred by a friend	
+88	eve	Sydney	87	30366.88	inactive	2026-05-16	vip	
+89	heidi	Paris	23	27082.05	active	2026-12-19	n/a	
+90	bob	Lagos	26	65684.35	active	2026-03-17	vip	
+91	oscar	Berlin	69	63597.25	inactive	2026-10-10	vip	
+92	ivan	New York	48	88602.53	inactive	2026-02-03	new customer, referred by a friend	
+93	heidi	Paris	89	73672.57	active	2026-05-21	new customer, referred by a friend	
+94	frank	Oslo	47	39255.91	inactive	2026-03-16	new customer, referred by a friend	
+95	judy	Lagos	46	25876.75	pending	2026-12-08		
+96	judy	Sydney	58	92799.76	active	2026-05-07		
+97	mallory	Tokyo	74	58143.31	pending	2026-03-20	new customer, referred by a friend	
+98	heidi	Paris	38	13861.97	active	2026-12-15	new customer, referred by a friend	
+99	eve	Sydney	48	11583.70	active	2026-12-22	new customer, referred by a friend	
+100	bob	Berlin	47	39700.79	inactive	2026-02-06		
+101	alice	Oslo	20	88887.61	active	2026-11-02	n/a	
+102	oscar	Paris	74	34244.32	inactive	2026-02-20	vip	
+103	bob	New York	69	23321.80	inactive	2026-07-25	vip	
+104	dave	New York	54	46257.58	pending	2026-07-07	n/a	
+105	oscar	São Paulo	60	49633.30	active	2026-04-03		
+106	alice	Zürich	79	31957.44	inactive	2026-10-10	vip	
+107	grace	Tokyo	37	79373.25	active	2026-01-13	vip	
+108	mallory	Paris	25	56474.41	inactive	2026-03-03	n/a	
+109	mallory	São Paulo	19	3546.96	active	2026-09-27	vip	
+110	alice	São Paulo	33	43250.99	active	2026-01-16	vip	
+111	oscar	São Paulo	42	66301.62	inactive	2026-06-21	new customer, referred by a friend	
+112	eve	New York	49	6018.41	pending	2026-03-12	n/a	
+113	judy	Paris	84	96914.24	inactive	2026-09-14	vip	
+114	oscar	Paris	72	91992.07	active	2026-12-09		
+115	eve	Tokyo	30	15100.98	active	2026-07-28		
+116	alice	Berlin	83	46916.68	inactive	2026-02-11		
+117	carol	Paris	22	44334.98	active	2026-07-25	n/a	
+118	alice	Paris	52	9037.66	inactive	2026-02-10		
+119	grace	Zürich	51	31320.67	active	2026-05-26	n/a	
+120	bob	São Paulo	30	42483.04	active	2026-09-18	vip	
+121	frank	Lagos	83	78362.14	pending	2026-08-04	vip	
+122	mallory	Toronto	85	98803.06	pending	2026-10-23		
+123	eve	Tokyo	43	37035.19	pending	2026-06-04	n/a	
+124	frank	Tokyo	26	4357.46	pending	2026-09-11	n/a	
+125	eve	Lagos	63	27266.94	pending	2026-12-17		
+126	ivan	Berlin	37	31711.08	pending	2026-06-26	new customer, referred by a friend	
+127	judy	Berlin	75	97941.16	inactive	2026-08-12	n/a	
+128	bob	Oslo	25	13458.12	pending	2026-08-19	new customer, referred by a friend	
+129	dave	Oslo	61	36157.78	pending	2026-06-13	new customer, referred by a friend	
+130	heidi	Oslo	61	53212.84	active	2026-01-05	new customer, referred by a friend	
+131	mallory	New York	90	13340.76	active	2026-03-25	n/a	
+132	oscar	Oslo	24	81172.81	pending	2026-11-09		
+133	dave	São Paulo	26	63214.11	pending	2026-11-03		
+134	dave	Tokyo	83	86183.41	active	2026-10-12	n/a	
+135	oscar	São Paulo	46	89128.15	pending	2026-08-28	vip	
+136	grace	Toronto	64	54447.63	active	2026-08-24		
+137	eve	Sydney	43	827.99	pending	2026-07-17	n/a	
+138	bob	Sydney	83	79623.19	pending	2026-07-02	new customer, referred by a friend	
+139	heidi	Zürich	42	96052.20	pending	2026-12-21		
+140	ivan	Berlin	56	51249.20	pending	2026-06-25	new customer, referred by a friend	
+141	ivan	Sydney	87	93962.61	pending	2026-07-20	new customer, referred by a friend	
+142	heidi	São Paulo	34	50631.74	pending	2026-03-18	vip	
+143	eve	Zürich	72	73613.53	pending	2026-01-12	n/a	
+144	grace	São Paulo	20	89874.79	active	2026-01-13	new customer, referred by a friend	
+145	heidi	São Paulo	65	63583.67	inactive	2026-06-13	n/a	
+146	bob	Toronto	63	14469.52	active	2026-01-06	new customer, referred by a friend	
+147	frank	Tokyo	54	94962.95	inactive	2026-05-17	new customer, referred by a friend	
+148	oscar	Sydney	53	43350.27	inactive	2026-04-23	n/a	
+149	grace	Sydney	29	6444.12	active	2026-03-08		
+150	bob	São Paulo	37	47978.71	active	2026-07-21	vip	
+151	alice	Berlin	72	61189.20	active	2026-09-07	n/a	
+152	frank	Zürich	31	73452.09	pending	2026-07-27		
+153	eve	São Paulo	40	47971.29	pending	2026-01-26	vip	
+154	mallory	Berlin	67	12378.83	inactive	2026-05-22	n/a	
+155	grace	Berlin	79	10582.97	inactive	2026-10-23	vip	
+156	carol	Paris	50	41660.40	pending	2026-05-28	n/a	
+157	mallory	Paris	45	78871.17	pending	2026-06-28	n/a	
+158	bob	Zürich	62	92581.28	pending	2026-05-02	n/a	
+159	eve	Berlin	47	50801.38	inactive	2026-12-08	n/a	
+160	carol	Tokyo	50	19531.06	pending	2026-11-20		
+161	ivan	Oslo	83	14885.48	inactive	2026-05-09	n/a	
+162	oscar	São Paulo	52	49132.65	inactive	2026-06-20	n/a	
+163	dave	Lagos	40	60573.22	active	2026-12-19	n/a	
+164	ivan	Tokyo	25	50394.64	pending	2026-12-05	vip	
+165	frank	Oslo	81	48040.70	active	2026-03-05	new customer, referred by a friend	
+166	dave	Berlin	86	82902.70	active	2026-10-06		
+167	dave	Oslo	43	50301.68	pending	2026-05-14	new customer, referred by a friend	
+168	alice	Zürich	57	82220.81	active	2026-02-24	vip	
+169	eve	Lagos	52	60113.90	pending	2026-07-01		
+170	frank	Lagos	35	11340.06	active	2026-11-19		
+171	frank	Berlin	29	72492.92	active	2026-05-11	vip	
+172	eve	Paris	24	36175.68	active	2026-03-13	new customer, referred by a friend	
+173	oscar	New York	30	67964.42	inactive	2026-01-17	new customer, referred by a friend	
+174	bob	Lagos	34	60616.04	inactive	2026-07-03	n/a	
+175	judy	Sydney	86	93389.74	inactive	2026-04-21	new customer, referred by a friend	
+176	ivan	Tokyo	24	60009.14	active	2026-03-08	vip	
+177	grace	São Paulo	87	1998.61	pending	2026-05-17	new customer, referred by a friend	
+178	heidi	Tokyo	69	70887.28	pending	2026-06-03	new customer, referred by a friend	
+179	ivan	Paris	82	68458.92	active	2026-10-10	n/a	
+180	mallory	Tokyo	37	7434.69	pending	2026-03-22	vip	
+181	heidi	Lagos	64	88859.24	active	2026-03-28	n/a	
+182	heidi	Sydney	33	97670.49	active	2026-05-10		
+183	ivan	Zürich	34	37950.63	pending	2026-02-15		
+184	grace	Oslo	72	27606.28	inactive	2026-07-13	n/a	
+185	alice	Berlin	78	77913.97	pending	2026-12-23		
+186	alice	Berlin	35	53044.40	inactive	2026-09-09	new customer, referred by a friend	
+187	heidi	New York	48	10554.04	inactive	2026-03-04		
+188	oscar	Lagos	72	87976.25	inactive	2026-05-22		
+189	judy	Sydney	71	37630.33	inactive	2026-06-15	vip	
+190	mallory	Oslo	84	14437.35	inactive	2026-11-04	vip	
+191	ivan	Toronto	61	75747.51	active	2026-10-01	n/a	
+192	dave	Sydney	40	39724.46	active	2026-02-08	new customer, referred by a friend	
+193	frank	New York	77	74298.61	inactive	2026-08-21	vip	
+194	grace	Toronto	69	54202.39	pending	2026-08-09	vip	
+195	carol	Zürich	66	41461.70	active	2026-11-03	vip	
+196	heidi	Sydney	82	79787.10	inactive	2026-03-05		
+197	eve	Zürich	77	39654.75	pending	2026-12-24	vip	
+198	ivan	Sydney	18	54412.35	active	2026-07-06	vip	
+199	frank	New York	27	77501.97	pending	2026-03-06	n/a	
+200	judy	Zürich	83	21686.30	active	2026-01-17	vip	
+
