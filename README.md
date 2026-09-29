@@ -27,7 +27,7 @@
 
 <br><br>
 
-<img src="docs/demo.gif" width="100%" alt="Demo: moving around people.tsv, editing a cell, adding a column with tt and naming it, deleting a column with xx, then undoing and redoing with u and Ctrl-R.">
+<img src="docs/demo.gif" width="100%" alt="Demo: moving around people.tsv, editing a cell, adding a column with tt and naming it, deleting a column with xx, undoing and redoing with u and Ctrl-R, then filtering for zürich vip so only matching rows remain with the matching cells highlighted.">
 
 <sub>Recorded from <code>samples/people.tsv</code> with <a href="https://github.com/charmbracelet/vhs">vhs</a> using <code>docs/demo.tape</code>.</sub>
 
@@ -43,6 +43,9 @@
   `:w` / `:q` / `:wq` to save and quit.
 - **Columns in two keystrokes.** `tt` adds a column to the right, `xx` deletes
   the one you're on.
+- **Filter as you type.** `/` then a few words: rows that don't contain every
+  word disappear, and the matching cells are highlighted so the hits stand
+  out. `Enter` keeps the filter while you move and edit, `Esc` clears it.
 - **Undo everything.** `u` and `Ctrl-R` undo and redo cell edits, rows and
   columns alike, and the unsaved marker clears when you undo back to the saved
   state.
@@ -97,6 +100,8 @@ A file argument is required.
 | `tt` | add a column to the right |
 | `xx` | delete the column (the last remaining column can't be deleted) |
 | `u` / `Ctrl-R` | undo / redo |
+| `/` | filter rows (see below) |
+| `Esc` | clear the filter |
 | `Ctrl-S` | save |
 | `q` | quit (refuses if there are unsaved changes) |
 | `Ctrl-C` | quit immediately, **discarding unsaved changes** |
@@ -107,6 +112,15 @@ A file argument is required.
 | `Enter` / `Tab` | commit and move down / right |
 | `←` `→` `Home` `End` | move the caret |
 | `Backspace` / `Delete` | delete before / at the caret |
+
+| Filter | |
+|---|---|
+| type | space-separated words; a row stays if every word appears in one of its cells, and cells containing a word are shown bold and underlined. Lowercase ignores case, any uppercase letter makes it case-sensitive |
+| `Enter` | keep the filter: `j` / `k`, `G` and paging skip hidden rows, and edits work as usual |
+| `Esc` | clear the filter |
+
+The header row always stays. The row the cursor is on stays visible even if an
+edit (or `o`) means it no longer matches, until you move off it.
 
 | Command | |
 |---|---|

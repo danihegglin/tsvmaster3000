@@ -43,8 +43,18 @@ Type "u" Sleep 1.5s
 Ctrl+R Sleep 1.5s
 Type "u" Sleep 1s
 
-# Undo everything, then leave without saving.
+# Undo everything.
 Type "uuu" Sleep 1.5s
+
+# Filter: only rows mentioning zürich stay, matching cells are highlighted.
+Type "/" Sleep 400ms
+Type "zürich" Sleep 1.5s
+Type " vip" Sleep 2s
+Enter Sleep 600ms
+Type "jjj" Sleep 1s
+Escape Sleep 1.2s
+
+# Leave without saving.
 Type ":q!" Sleep 600ms
 Enter
 Sleep 500ms

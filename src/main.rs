@@ -29,6 +29,47 @@ enum Mode {
     Normal,
     Insert,
     Command,
+    Filter,
+}
+
+/// Live row filter. A row stays if every term occurs in one of its cells;
+/// cells that contain one of the terms are highlighted.
+struct Filter {
+    query: String,
+    terms: Vec<String>,
+    /// Smartcase: an uppercase letter in the query makes it case-sensitive.
+    case: bool,
+    /// Matching data rows (never the header), ascending.
+    rows: Vec<usize>,
+}
+
+impl Filter {
+    fn new(query: String) -> Self {
+        let case = query.chars().any(char::is_uppercase);
+        let terms = query
+            .split_whitespace()
+            .map(|t| if case { t.to_owned() } else { t.to_lowercase() })
+            .collect();
+        Self { query, terms, case, rows: Vec::new() }
+    }
+
+    fn fold<'a>(&self, s: &'a str) -> std::borrow::Cow<'a, str> {
+        if self.case {
+            s.into()
+        } else {
+            s.to_lowercase().into()
+        }
+    }
+
+    fn cell_hit(&self, s: &str) -> bool {
+        let s = self.fold(s);
+        self.terms.iter().any(|t| s.contains(t.as_str()))
+    }
+
+    fn row_hit(&self, row: &[String]) -> bool {
+        let cells: Vec<_> = row.iter().map(|c| self.fold(c)).collect();
+        self.terms.iter().all(|t| cells.iter().any(|c| c.contains(t.as_str())))
+    }
 }
 
 /// A reversible edit. `App::exec` applies one and returns its inverse, so the
@@ -69,6 +110,7 @@ struct App {
     caret: usize, // byte offset into `edit`
     cmd: String,
     pending: Option<Pending>,
+    filter: Option<Filter>,
     undo: Vec<Entry>,
     redo: Vec<Entry>,
     next_id: u64,
@@ -119,6 +161,7 @@ impl App {
             caret: 0,
             cmd: String::new(),
             pending: None,
+            filter: None,
             undo: Vec::new(),
             redo: Vec::new(),
             next_id: 0,
@@ -191,7 +234,68 @@ impl App {
             Mode::Normal => self.normal(k),
             Mode::Insert => self.insert(k),
             Mode::Command => self.command(k),
+            Mode::Filter => self.filter_key(k),
         }
+    }
+
+    fn filter_key(&mut self, k: KeyEvent) {
+        let mut query = self.filter.as_ref().map(|f| f.query.clone()).unwrap_or_default();
+        match k.code {
+            KeyCode::Esc => {
+                self.filter = None;
+                self.mode = Mode::Normal;
+                return;
+            }
+            KeyCode::Enter => {
+                self.mode = Mode::Normal;
+                if query.is_empty() {
+                    self.filter = None;
+                } else {
+                    self.status = "filter kept — / to change, Esc to clear".into();
+                }
+                return;
+            }
+            KeyCode::Backspace => {
+                query.pop();
+            }
+            KeyCode::Char(c) => query.push(c),
+            _ => return,
+        }
+        self.set_filter(query);
+    }
+
+    /// Replace the filter query and bring the cursor to a matching row.
+    fn set_filter(&mut self, query: String) {
+        self.filter = Some(Filter::new(query));
+        self.refilter();
+        let f = self.filter.as_ref().unwrap();
+        let rows = &f.rows;
+        if !f.terms.is_empty() && rows.binary_search(&self.cur.0).is_err() {
+            self.cur.0 = rows.first().copied().unwrap_or(0);
+        }
+    }
+
+    /// Recompute which rows match, after the query or the grid changed.
+    fn refilter(&mut self) {
+        let Some(f) = self.filter.as_mut() else { return };
+        f.rows = if f.terms.is_empty() {
+            (1..self.rows.len()).collect()
+        } else {
+            (1..self.rows.len()).filter(|&r| f.row_hit(&self.rows[r])).collect()
+        };
+    }
+
+    /// Data rows on screen while filtering, ascending: the matches plus the
+    /// cursor's row, so a row doesn't vanish while you're working on it.
+    fn visible(&self) -> Option<Vec<usize>> {
+        let f = self.filter.as_ref()?;
+        let mut rows = f.rows.clone();
+        if self.cur.0 > 0 {
+            if let Err(i) = rows.binary_search(&self.cur.0) {
+                rows.insert(i, self.cur.0);
+            }
+        }
+        Some(rows)
     }
 
     fn normal(&mut self, k: KeyEvent) {
@@ -224,7 +328,19 @@ impl App {
             KeyCode::Home | KeyCode::Char('0') => self.cur.1 = 0,
             KeyCode::End | KeyCode::Char('$') => self.cur.1 = self.ncols() - 1,
             KeyCode::Char('g') => self.cur.0 = 0,
-            KeyCode::Char('G') => self.cur.0 = self.rows.len() - 1,
+            KeyCode::Char('G') => {
+                let last = self.visible().map_or(self.rows.len() - 1, |v| v.last().copied().unwrap_or(0));
+                self.cur.0 = last;
+            }
+            KeyCode::Char('/') => {
+                self.mode = Mode::Filter;
+                let query = self.filter.take().map(|f| f.query).unwrap_or_default();
+                self.set_filter(query);
+            }
+            KeyCode::Esc if self.filter.is_some() => {
+                self.filter = None;
+                self.status = "filter cleared".into();
+            }
             KeyCode::Char('i') => self.begin_edit(false),
             KeyCode::Char('a') => self.begin_edit(true),
             // Clear right away; a second `x` turns it into a column delete.
@@ -333,7 +449,7 @@ impl App {
                     ":h" => {
                         self.status =
                             "arrows/hjkl/Tab move · i,a edit · Esc commit · x clear · o new row \
-                             · D delete row · tt/xx add/delete column · u/^R undo/redo \
+                             · D delete row · tt/xx add/delete column · u/^R undo/redo · / filter \
                              · g,G,0,$ jump · :w :q :wq"
                                 .into()
                     }
@@ -390,6 +506,7 @@ impl App {
     /// Apply a new edit and make it undoable.
     fn record(&mut self, ch: Change) {
         let change = self.exec(ch);
+        self.refilter();
         self.next_id += 1;
         self.undo.push(Entry { id: self.next_id, change });
         self.redo.clear();
@@ -401,6 +518,7 @@ impl App {
             return;
         };
         let change = self.exec(change);
+        self.refilter();
         self.redo.push(Entry { id, change });
         self.status = format!("undone — {} more, ^R to redo", self.undo.len());
     }
@@ -411,6 +529,7 @@ impl App {
             return;
         };
         let change = self.exec(change);
+        self.refilter();
         self.undo.push(Entry { id, change });
         self.status = format!("redone — {} more", self.redo.len());
     }
@@ -459,9 +578,15 @@ impl App {
     }
 
     fn move_to(&mut self, dr: i32, dc: i32) {
-        let r = (self.cur.0 as i32 + dr).clamp(0, self.rows.len() as i32 - 1);
         let c = (self.cur.1 as i32 + dc).clamp(0, self.ncols() as i32 - 1);
-        self.cur = (r as usize, c as usize);
+        self.cur.1 = c as usize;
+        // While filtering, step through the visible rows (header first).
+        let rows = match self.visible() {
+            Some(v) => [0].into_iter().chain(v).collect(),
+            None => (0..self.rows.len()).collect::<Vec<_>>(),
+        };
+        let i = rows.binary_search(&self.cur.0).unwrap_or_else(|i| i);
+        self.cur.0 = rows[(i as i32 + dr).clamp(0, rows.len() as i32 - 1) as usize];
     }
 
     // --------------------------------------------------------------- render
@@ -486,8 +611,14 @@ impl App {
             .collect();
 
         // Vertical scrolling over data rows only (row 0 is a pinned header).
+        let vis = self.visible();
+        let n = vis.as_ref().map_or(self.rows.len() - 1, Vec::len);
+        let row_at = |i: usize| vis.as_ref().map_or(i + 1, |v| v[i]);
         if self.cur.0 >= 1 {
-            let d = self.cur.0 - 1;
+            let d = match &vis {
+                Some(v) => v.binary_search(&self.cur.0).unwrap_or_else(|i| i),
+                None => self.cur.0 - 1,
+            };
             self.off.0 = self.off.0.min(d);
             if d >= self.off.0 + body_h {
                 self.off.0 = d + 1 - body_h;
@@ -517,8 +648,9 @@ impl App {
 
         let mut lines = Vec::with_capacity(body_h + 1);
         lines.push(self.line(0, &cols, &widths, gutter));
-        for r in (self.off.0 + 1)..self.rows.len().min(self.off.0 + 1 + body_h) {
-            lines.push(self.line(r, &cols, &widths, gutter));
+        self.off.0 = self.off.0.min(n.saturating_sub(body_h));
+        for i in self.off.0..n.min(self.off.0 + body_h) {
+            lines.push(self.line(row_at(i), &cols, &widths, gutter));
         }
 
         f.render_widget(Paragraph::new(lines), area);
@@ -528,6 +660,11 @@ impl App {
     fn line(&self, r: usize, cols: &[usize], widths: &[usize], gutter: usize) -> Line<'static> {
         let header = r == 0;
         let active_row = r == self.cur.0;
+        // Only highlight hits in rows that actually match.
+        let filter = self
+            .filter
+            .as_ref()
+            .filter(|f| !header && !f.terms.is_empty() && f.rows.binary_search(&r).is_ok());
         let mut spans = Vec::with_capacity(cols.len() * 2 + 1);
         spans.push(Span::styled(
             format!("{:>gutter$} ", if header { "#".into() } else { r.to_string() }),
@@ -562,7 +699,19 @@ impl App {
                 if active {
                     style = style.add_modifier(Modifier::REVERSED | Modifier::BOLD);
                 }
-                spans.push(Span::styled(fit(&self.rows[r][c], w), style));
+                let cell = &self.rows[r][c];
+                let mut text = fit(cell, w);
+                if filter.is_some_and(|f| f.cell_hit(cell)) {
+                    // Underline just the text, not the column padding.
+                    let pad = text.split_off(text.trim_end_matches(' ').len());
+                    spans.push(Span::styled(
+                        text,
+                        style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                    ));
+                    spans.push(Span::styled(pad, style));
+                } else {
+                    spans.push(Span::styled(text, style));
+                }
             }
             spans.push(Span::raw(" "));
         }
@@ -572,6 +721,17 @@ impl App {
     fn status_line(&self) -> Paragraph<'static> {
         if self.mode == Mode::Command {
             return Paragraph::new(self.cmd.clone());
+        }
+        let count = |f: &Filter| format!("{} of {} rows", f.rows.len(), self.rows.len() - 1);
+        if let (Mode::Filter, Some(f)) = (self.mode, &self.filter) {
+            return Paragraph::new(Line::from(vec![
+                Span::raw(format!("/{}", f.query)),
+                Span::styled(" ", Style::new().add_modifier(Modifier::REVERSED)),
+                Span::styled(
+                    format!("  {} — Enter keeps, Esc clears", count(f)),
+                    Style::new().fg(Color::DarkGray),
+                ),
+            ]));
         }
         let (tag, color) = match self.mode {
             Mode::Insert => (" INSERT ", Color::LightGreen),
@@ -583,7 +743,7 @@ impl App {
             Span::styled(tag, Style::new().fg(Color::Black).bg(color).bold()),
             Span::styled(
                 format!(
-                    " {name}{}  {}:{} [{}] {} ",
+                    " {name}{}  {}:{} [{}] {}{} ",
                     if self.dirty() { " *" } else { "" },
                     self.cur.0,
                     self.cur.1 + 1,
@@ -592,7 +752,10 @@ impl App {
                         Some(Pending::T) => "t",
                         Some(Pending::X { .. }) => "x",
                         None => "",
-                    }
+                    },
+                    self.filter
+                        .as_ref()
+                        .map_or(String::new(), |f| format!(" /{} ({})", f.query, count(f)))
                 ),
                 Style::new().fg(Color::Gray),
             ),
@@ -725,5 +888,48 @@ mod tests {
         ctrl_r(&mut a);
         assert!(!a.dirty());
         let _ = fs::remove_file(&a.path);
+    }
+
+    const PEOPLE: &str = "name\tcity\n\
+                          ann\tZürich\n\
+                          bob\tOslo\n\
+                          cat\tzürich\n\
+                          dan\tBern\n";
+
+    #[test]
+    fn filter_keeps_matching_rows_and_marks_hit_cells() {
+        let mut a = app(PEOPLE);
+        keys(&mut a, "/zür");
+        let f = a.filter.as_ref().unwrap();
+        assert_eq!(f.rows, [1, 3]);
+        assert!(f.cell_hit("Zürich") && !f.cell_hit("ann"));
+        assert_eq!(a.cur.0, 1);
+        keys(&mut a, "\njjj");
+        assert_eq!(a.cur.0, 3, "j skips hidden rows and stops at the last match");
+        keys(&mut a, "k");
+        assert_eq!(a.cur.0, 1);
+    }
+
+    #[test]
+    fn filter_terms_and_smartcase() {
+        let mut a = app(PEOPLE);
+        keys(&mut a, "/Zür");
+        assert_eq!(a.filter.as_ref().unwrap().rows, [1]);
+        keys(&mut a, "\x1b/zür cat");
+        assert_eq!(a.filter.as_ref().unwrap().rows, [3], "every term must match");
+    }
+
+    #[test]
+    fn esc_clears_filter_and_edits_keep_the_cursor_row() {
+        let mut a = app(PEOPLE);
+        keys(&mut a, "/oslo\n");
+        assert_eq!(a.cur.0, 2);
+        keys(&mut a, "lxo");
+        assert_eq!(a.filter.as_ref().unwrap().rows, Vec::<usize>::new());
+        assert_eq!(a.visible().unwrap(), [3], "the new row stays while the cursor is on it");
+        keys(&mut a, "\x1b");
+        assert!(a.filter.is_none());
+        keys(&mut a, "G");
+        assert_eq!(a.cur.0, 5);
     }
 }
