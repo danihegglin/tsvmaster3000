@@ -637,15 +637,15 @@ impl App {
         let vis = self.visible();
         let n = vis.as_ref().map_or(self.rows.len() - 1, Vec::len);
         let row_at = |i: usize| vis.as_ref().map_or(i + 1, |v| v[i]);
-        if self.cur.0 >= 1 {
-            let d = match &vis {
-                Some(v) => v.binary_search(&self.cur.0).unwrap_or_else(|i| i),
-                None => self.cur.0 - 1,
-            };
-            self.off.0 = self.off.0.min(d);
-            if d >= self.off.0 + body_h {
-                self.off.0 = d + 1 - body_h;
-            }
+        // On the header, scroll to the first data row.
+        let d = match &vis {
+            _ if self.cur.0 == 0 => 0,
+            Some(v) => v.binary_search(&self.cur.0).unwrap_or_else(|i| i),
+            None => self.cur.0 - 1,
+        };
+        self.off.0 = self.off.0.min(d);
+        if d >= self.off.0 + body_h {
+            self.off.0 = d + 1 - body_h;
         }
 
         // Horizontal scrolling: advance the offset until the cursor column fits.
@@ -957,6 +957,29 @@ mod tests {
         assert_eq!(a.cur.0, 4);
         keys(&mut a, ":3x\n");
         assert_eq!(a.status, "unknown command: :3x");
+    }
+
+    /// Render into an in-memory terminal and return the first cell of each
+    /// line below the header.
+    fn first_column(app: &mut App, height: u16) -> Vec<String> {
+        let mut term = ratatui::Terminal::new(ratatui::backend::TestBackend::new(40, height)).unwrap();
+        let buf = term.draw(|f| app.draw(f)).unwrap().buffer.clone();
+        (1..height - 1)
+            .map(|y| (0..40).map(|x| buf[(x, y)].symbol()).collect::<String>())
+            .map(|s| s.split_whitespace().nth(1).unwrap_or("").to_owned())
+            .collect()
+    }
+
+    #[test]
+    fn g_scrolls_back_to_the_first_row() {
+        let tsv: String = (0..100).map(|i| format!("r{i}\n")).collect();
+        let mut a = app(&tsv);
+        keys(&mut a, "G");
+        assert_eq!(first_column(&mut a, 7).last().unwrap(), "r99");
+        keys(&mut a, "g");
+        assert_eq!(first_column(&mut a, 7), ["r1", "r2", "r3", "r4", "r5"]);
+        keys(&mut a, "G:0\n");
+        assert_eq!(first_column(&mut a, 7)[0], "r1");
     }
 
     #[test]
