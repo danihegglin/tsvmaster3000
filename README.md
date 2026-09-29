@@ -96,7 +96,7 @@ A file argument is required.
 | `i` / `a` | edit the cell (caret at start / end) |
 | `x` | clear the cell |
 | `o` | new row below |
-| `D` | delete the row (the header row can't be deleted) |
+| `dd` / `D` | delete the row (the header row can't be deleted) |
 | `tt` | add a column to the right |
 | `xx` | delete the column (the last remaining column can't be deleted) |
 | `u` / `Ctrl-R` | undo / redo |
@@ -109,7 +109,8 @@ A file argument is required.
 | Insert | |
 |---|---|
 | `Esc` | commit |
-| `Enter` / `Tab` | commit and move down / right |
+| `Enter` | commit and move down |
+| `Tab` / `Shift-Tab` | commit and keep editing the cell to the right / left (`Tab` on the last column adds a new one) |
 | `←` `→` `Home` `End` | move the caret |
 | `Backspace` / `Delete` | delete before / at the caret |
 
@@ -126,7 +127,8 @@ edit (or `o`) means it no longer matches, until you move off it.
 |---|---|
 | `:w` | save |
 | `:q` / `:q!` | quit / quit discarding changes |
-| `:wq` / `:x` | save and quit |
+| `:wq` / `:wq!` / `:x` | save and quit (if the save fails, it stays open) |
+| `:N` / `:$` | go to row N (the number in the left gutter) / the last row |
 | `:h` | show a key summary in the status line |
 
 ## 📝 Good to know

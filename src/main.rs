@@ -93,6 +93,7 @@ struct Entry {
 #[derive(Clone, Copy)]
 enum Pending {
     T,
+    D,
     /// `x` already cleared the cell; `cleared` says whether that made an
     /// undo entry that `xx` should take back.
     X { cleared: bool },
@@ -302,6 +303,7 @@ impl App {
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
         match (self.pending.take(), k.code) {
             (Some(Pending::T), KeyCode::Char('t')) => return self.add_column(),
+            (Some(Pending::D), KeyCode::Char('d')) => return self.delete_row(),
             (Some(Pending::X { cleared }), KeyCode::Char('x')) => {
                 if cleared {
                     self.undo();
@@ -317,6 +319,7 @@ impl App {
             KeyCode::Char('r') if ctrl => self.redo(),
             KeyCode::Char('u') => self.undo(),
             KeyCode::Char('t') => self.pending = Some(Pending::T),
+            KeyCode::Char('d') => self.pending = Some(Pending::D),
             KeyCode::Up | KeyCode::Char('k') => self.move_to(-1, 0),
             KeyCode::Down | KeyCode::Char('j') | KeyCode::Enter => self.move_to(1, 0),
             KeyCode::Left | KeyCode::Char('h') => self.move_to(0, -1),
@@ -357,11 +360,7 @@ impl App {
                 let row = vec![String::new(); self.ncols()];
                 self.record(Change::InsertRow { r, row });
             }
-            KeyCode::Char('D') => {
-                if self.cur.0 > 0 && self.rows.len() > 1 {
-                    self.record(Change::DeleteRow { r: self.cur.0 });
-                }
-            }
+            KeyCode::Char('D') => self.delete_row(),
             KeyCode::Char(':') => {
                 self.mode = Mode::Command;
                 self.cmd = ":".into();
@@ -381,9 +380,18 @@ impl App {
         match k.code {
             KeyCode::Esc => self.commit(0),
             KeyCode::Enter => self.commit(1),
-            KeyCode::Tab => {
+            // Commit and keep editing in the neighbouring cell; Tab past the
+            // last column adds a new one.
+            KeyCode::Tab | KeyCode::BackTab => {
                 self.commit(0);
-                self.move_to(0, 1);
+                if k.code == KeyCode::BackTab {
+                    self.move_to(0, -1);
+                } else if self.cur.1 + 1 == self.ncols() {
+                    self.add_column();
+                } else {
+                    self.move_to(0, 1);
+                }
+                self.begin_edit(true);
             }
             KeyCode::Char(c) => {
                 self.edit.insert(self.caret, c);
@@ -434,7 +442,7 @@ impl App {
                 self.mode = Mode::Normal;
                 match cmd.as_str() {
                     ":w" => self.save(),
-                    ":wq" | ":x" => {
+                    ":wq" | ":wq!" | ":x" | ":x!" => {
                         self.save();
                         self.quit = !self.dirty();
                     }
@@ -449,11 +457,16 @@ impl App {
                     ":h" => {
                         self.status =
                             "arrows/hjkl/Tab move · i,a edit · Esc commit · x clear · o new row \
-                             · D delete row · tt/xx add/delete column · u/^R undo/redo · / filter \
-                             · g,G,0,$ jump · :w :q :wq"
+                             · dd delete row · tt/xx add/delete column · u/^R undo/redo · / filter \
+                             · g,G,0,$ jump · :N go to row · :w :q :wq"
                                 .into()
                     }
-                    other => self.status = format!("unknown command: {other}"),
+                    ":$" => self.cur.0 = self.rows.len() - 1,
+                    // `:N` jumps to row N as numbered in the gutter (0 = header).
+                    other => match other[1..].parse::<usize>() {
+                        Ok(n) => self.cur.0 = n.min(self.rows.len() - 1),
+                        Err(_) => self.status = format!("unknown command: {other}"),
+                    },
                 }
             }
             _ => {}
@@ -539,6 +552,16 @@ impl App {
         let col = vec![String::new(); self.rows.len()];
         self.record(Change::InsertCol { c, col });
         self.status = format!("added column {} — u to undo", c + 1);
+    }
+
+    fn delete_row(&mut self) {
+        let r = self.cur.0;
+        if r == 0 {
+            self.status = "can't delete the header row".into();
+            return;
+        }
+        self.record(Change::DeleteRow { r });
+        self.status = format!("deleted row {r} — u to undo");
     }
 
     fn delete_column(&mut self) {
@@ -750,6 +773,7 @@ impl App {
                     if head.is_empty() { "—".into() } else { head },
                     match self.pending {
                         Some(Pending::T) => "t",
+                        Some(Pending::D) => "d",
                         Some(Pending::X { .. }) => "x",
                         None => "",
                     },
@@ -807,6 +831,7 @@ mod tests {
             let code = match ch {
                 '\x1b' => KeyCode::Esc,
                 '\n' => KeyCode::Enter,
+                '\t' => KeyCode::Tab,
                 c => KeyCode::Char(c),
             };
             app.on_key(KeyEvent::new(code, KeyModifiers::NONE));
@@ -895,6 +920,58 @@ mod tests {
                           bob\tOslo\n\
                           cat\tzürich\n\
                           dan\tBern\n";
+
+    #[test]
+    fn dd_deletes_the_row_but_not_the_header() {
+        let mut a = app("h\n1\n2\n");
+        keys(&mut a, "jdd");
+        assert_eq!(grid(&a), "h\n2");
+        keys(&mut a, "gdd");
+        assert_eq!(grid(&a), "h\n2");
+        keys(&mut a, "jdjd");
+        assert_eq!(grid(&a), "h\n2", "d then another key is not a delete");
+        keys(&mut a, "u");
+        assert_eq!(grid(&a), "h\n1\n2");
+    }
+
+    #[test]
+    fn tab_on_the_last_column_adds_one() {
+        let mut a = app("a\tb\n1\t2\n");
+        keys(&mut a, "j$ix\ty\x1b");
+        assert_eq!(grid(&a), "a\tb\t\n1\tx2\ty");
+        assert_eq!(a.cur, (1, 2));
+        keys(&mut a, "uu");
+        assert_eq!(grid(&a), "a\tb\n1\tx2");
+    }
+
+    #[test]
+    fn colon_number_jumps_to_row() {
+        let mut a = app(PEOPLE);
+        keys(&mut a, ":3\n");
+        assert_eq!(a.cur.0, 3);
+        keys(&mut a, ":100\n");
+        assert_eq!(a.cur.0, 4, "clamped to the last row");
+        keys(&mut a, ":0\n");
+        assert_eq!(a.cur.0, 0);
+        keys(&mut a, ":$\n");
+        assert_eq!(a.cur.0, 4);
+        keys(&mut a, ":3x\n");
+        assert_eq!(a.status, "unknown command: :3x");
+    }
+
+    #[test]
+    fn tab_keeps_editing_in_the_next_cell() {
+        let mut a = app("a\tb\n1\t2\n");
+        keys(&mut a, "jix\ty");
+        assert!(a.mode == Mode::Insert);
+        assert_eq!(a.cur, (1, 1));
+        a.on_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
+        assert!(a.mode == Mode::Insert);
+        keys(&mut a, "z\x1b");
+        assert_eq!(grid(&a), "a\tb\nx1z\t2y");
+        keys(&mut a, "u");
+        assert_eq!(grid(&a), "a\tb\nx1\t2y", "each cell is its own undo step");
+    }
 
     #[test]
     fn filter_keeps_matching_rows_and_marks_hit_cells() {
