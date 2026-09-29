@@ -31,6 +31,32 @@ enum Mode {
     Command,
 }
 
+/// A reversible edit. `App::exec` applies one and returns its inverse, so the
+/// undo and redo stacks just hold whatever undoes the last step.
+enum Change {
+    SetCell { r: usize, c: usize, value: String },
+    InsertRow { r: usize, row: Vec<String> },
+    DeleteRow { r: usize },
+    InsertCol { c: usize, col: Vec<String> },
+    DeleteCol { c: usize },
+}
+
+struct Entry {
+    /// Stays with the edit across undo/redo, so we can tell whether the grid
+    /// is back at the saved state.
+    id: u64,
+    change: Change,
+}
+
+/// First key of a two-key normal-mode command.
+#[derive(Clone, Copy)]
+enum Pending {
+    T,
+    /// `x` already cleared the cell; `cleared` says whether that made an
+    /// undo entry that `xx` should take back.
+    X { cleared: bool },
+}
+
 struct App {
     path: PathBuf,
     /// Row 0 is the header, rows 1.. are data.
@@ -42,7 +68,12 @@ struct App {
     edit: String,
     caret: usize, // byte offset into `edit`
     cmd: String,
-    dirty: bool,
+    pending: Option<Pending>,
+    undo: Vec<Entry>,
+    redo: Vec<Entry>,
+    next_id: u64,
+    /// Id of the newest undo entry when the file was last written.
+    saved: Option<u64>,
     status: String,
     quit: bool,
 }
@@ -87,13 +118,15 @@ impl App {
             edit: String::new(),
             caret: 0,
             cmd: String::new(),
-            dirty: false,
+            pending: None,
+            undo: Vec::new(),
+            redo: Vec::new(),
+            next_id: 0,
+            saved: None,
             status: String::new(),
             quit: false,
         };
-        for c in 0..ncols {
-            app.measure(c);
-        }
+        app.measure_all();
         app.status = format!("{} rows × {} cols — :h for help", app.rows.len() - 1, ncols);
         Ok(app)
     }
@@ -114,6 +147,16 @@ impl App {
         self.widths[col] = w.clamp(MIN_COL, MAX_COL);
     }
 
+    fn measure_all(&mut self) {
+        for c in 0..self.ncols() {
+            self.measure(c);
+        }
+    }
+
+    fn dirty(&self) -> bool {
+        self.undo.last().map(|e| e.id) != self.saved
+    }
+
     fn save(&mut self) {
         let mut out = String::with_capacity(self.rows.len() * 32);
         for r in &self.rows {
@@ -122,7 +165,7 @@ impl App {
         }
         match fs::write(&self.path, out) {
             Ok(()) => {
-                self.dirty = false;
+                self.saved = self.undo.last().map(|e| e.id);
                 self.status = format!("wrote {}", self.path.display());
             }
             Err(e) => self.status = format!("error: {e}"),
@@ -153,9 +196,23 @@ impl App {
 
     fn normal(&mut self, k: KeyEvent) {
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+        match (self.pending.take(), k.code) {
+            (Some(Pending::T), KeyCode::Char('t')) => return self.add_column(),
+            (Some(Pending::X { cleared }), KeyCode::Char('x')) => {
+                if cleared {
+                    self.undo();
+                }
+                return self.delete_column();
+            }
+            // Anything else ends the pending command and runs as usual.
+            _ => {}
+        }
         match k.code {
             KeyCode::Char('s') if ctrl => self.save(),
             KeyCode::Char('c') if ctrl => self.quit = true,
+            KeyCode::Char('r') if ctrl => self.redo(),
+            KeyCode::Char('u') => self.undo(),
+            KeyCode::Char('t') => self.pending = Some(Pending::T),
             KeyCode::Up | KeyCode::Char('k') => self.move_to(-1, 0),
             KeyCode::Down | KeyCode::Char('j') | KeyCode::Enter => self.move_to(1, 0),
             KeyCode::Left | KeyCode::Char('h') => self.move_to(0, -1),
@@ -170,26 +227,23 @@ impl App {
             KeyCode::Char('G') => self.cur.0 = self.rows.len() - 1,
             KeyCode::Char('i') => self.begin_edit(false),
             KeyCode::Char('a') => self.begin_edit(true),
+            // Clear right away; a second `x` turns it into a column delete.
             KeyCode::Char('x') => {
-                self.cell_mut().clear();
-                let c = self.cur.1;
-                self.measure(c);
-                self.dirty = true;
+                let (r, c) = self.cur;
+                let cleared = !self.rows[r][c].is_empty();
+                if cleared {
+                    self.record(Change::SetCell { r, c, value: String::new() });
+                }
+                self.pending = Some(Pending::X { cleared });
             }
             KeyCode::Char('o') => {
                 let r = (self.cur.0 + 1).max(1);
-                self.rows.insert(r, vec![String::new(); self.ncols()]);
-                self.cur.0 = r;
-                self.dirty = true;
+                let row = vec![String::new(); self.ncols()];
+                self.record(Change::InsertRow { r, row });
             }
             KeyCode::Char('D') => {
                 if self.cur.0 > 0 && self.rows.len() > 1 {
-                    self.rows.remove(self.cur.0);
-                    self.cur.0 = self.cur.0.min(self.rows.len() - 1);
-                    for c in 0..self.ncols() {
-                        self.measure(c);
-                    }
-                    self.dirty = true;
+                    self.record(Change::DeleteRow { r: self.cur.0 });
                 }
             }
             KeyCode::Char(':') => {
@@ -197,7 +251,7 @@ impl App {
                 self.cmd = ":".into();
             }
             KeyCode::Char('q') => {
-                if self.dirty {
+                if self.dirty() {
                     self.status = "unsaved changes — :w to write, :q! to discard".into();
                 } else {
                     self.quit = true;
@@ -266,10 +320,10 @@ impl App {
                     ":w" => self.save(),
                     ":wq" | ":x" => {
                         self.save();
-                        self.quit = !self.dirty;
+                        self.quit = !self.dirty();
                     }
                     ":q" => {
-                        if self.dirty {
+                        if self.dirty() {
                             self.status = "unsaved changes — :q! to discard".into();
                         } else {
                             self.quit = true;
@@ -279,7 +333,8 @@ impl App {
                     ":h" => {
                         self.status =
                             "arrows/hjkl/Tab move · i,a edit · Esc commit · x clear · o new row \
-                             · D delete row · g,G,0,$ jump · :w :q :wq"
+                             · D delete row · tt/xx add/delete column · u/^R undo/redo \
+                             · g,G,0,$ jump · :w :q :wq"
                                 .into()
                     }
                     other => self.status = format!("unknown command: {other}"),
@@ -291,8 +346,95 @@ impl App {
 
     // ----------------------------------------------------------------- edit
 
-    fn cell_mut(&mut self) -> &mut String {
-        &mut self.rows[self.cur.0][self.cur.1]
+    /// Apply `ch`, put the cursor on it, and return the change that undoes it.
+    fn exec(&mut self, ch: Change) -> Change {
+        match ch {
+            Change::SetCell { r, c, value } => {
+                let old = std::mem::replace(&mut self.rows[r][c], value);
+                self.measure(c);
+                self.cur = (r, c);
+                Change::SetCell { r, c, value: old }
+            }
+            Change::InsertRow { r, row } => {
+                for (w, cell) in self.widths.iter_mut().zip(&row) {
+                    *w = (*w).max(cell.width().min(MAX_COL));
+                }
+                self.rows.insert(r, row);
+                self.cur.0 = r;
+                Change::DeleteRow { r }
+            }
+            Change::DeleteRow { r } => {
+                let row = self.rows.remove(r);
+                self.measure_all();
+                self.cur.0 = r.min(self.rows.len() - 1);
+                Change::InsertRow { r, row }
+            }
+            Change::InsertCol { c, col } => {
+                for (row, cell) in self.rows.iter_mut().zip(col) {
+                    row.insert(c, cell);
+                }
+                self.widths.insert(c, 0);
+                self.measure(c);
+                self.cur.1 = c;
+                Change::DeleteCol { c }
+            }
+            Change::DeleteCol { c } => {
+                let col = self.rows.iter_mut().map(|row| row.remove(c)).collect();
+                self.widths.remove(c);
+                self.cur.1 = c.min(self.ncols() - 1);
+                Change::InsertCol { c, col }
+            }
+        }
+    }
+
+    /// Apply a new edit and make it undoable.
+    fn record(&mut self, ch: Change) {
+        let change = self.exec(ch);
+        self.next_id += 1;
+        self.undo.push(Entry { id: self.next_id, change });
+        self.redo.clear();
+    }
+
+    fn undo(&mut self) {
+        let Some(Entry { id, change }) = self.undo.pop() else {
+            self.status = "already at oldest change".into();
+            return;
+        };
+        let change = self.exec(change);
+        self.redo.push(Entry { id, change });
+        self.status = format!("undone — {} more, ^R to redo", self.undo.len());
+    }
+
+    fn redo(&mut self) {
+        let Some(Entry { id, change }) = self.redo.pop() else {
+            self.status = "already at newest change".into();
+            return;
+        };
+        let change = self.exec(change);
+        self.undo.push(Entry { id, change });
+        self.status = format!("redone — {} more", self.redo.len());
+    }
+
+    fn add_column(&mut self) {
+        let c = self.cur.1 + 1;
+        let col = vec![String::new(); self.rows.len()];
+        self.record(Change::InsertCol { c, col });
+        self.status = format!("added column {} — u to undo", c + 1);
+    }
+
+    fn delete_column(&mut self) {
+        if self.ncols() == 1 {
+            self.status = "can't delete the only column".into();
+            return;
+        }
+        let c = self.cur.1;
+        let name = self.rows[0][c].clone();
+        self.record(Change::DeleteCol { c });
+        self.status = if name.is_empty() {
+            format!("deleted column {} — u to undo", c + 1)
+        } else {
+            format!("deleted column {} ({name}) — u to undo", c + 1)
+        };
     }
 
     fn begin_edit(&mut self, at_end: bool) {
@@ -303,13 +445,11 @@ impl App {
 
     /// Write the edit buffer back into the grid and leave insert mode.
     fn commit(&mut self, then_down: i32) {
-        let value = std::mem::take(&mut self.edit);
-        if value != self.rows[self.cur.0][self.cur.1] {
-            // Tabs and newlines would corrupt the file format.
-            *self.cell_mut() = value.replace(['\t', '\n', '\r'], " ");
-            let c = self.cur.1;
-            self.measure(c);
-            self.dirty = true;
+        // Tabs and newlines would corrupt the file format.
+        let value = std::mem::take(&mut self.edit).replace(['\t', '\n', '\r'], " ");
+        let (r, c) = self.cur;
+        if value != self.rows[r][c] {
+            self.record(Change::SetCell { r, c, value });
         }
         self.mode = Mode::Normal;
         self.caret = 0;
@@ -443,11 +583,16 @@ impl App {
             Span::styled(tag, Style::new().fg(Color::Black).bg(color).bold()),
             Span::styled(
                 format!(
-                    " {name}{}  {}:{} [{}]  ",
-                    if self.dirty { " *" } else { "" },
+                    " {name}{}  {}:{} [{}] {} ",
+                    if self.dirty() { " *" } else { "" },
                     self.cur.0,
                     self.cur.1 + 1,
-                    if head.is_empty() { "—".into() } else { head }
+                    if head.is_empty() { "—".into() } else { head },
+                    match self.pending {
+                        Some(Pending::T) => "t",
+                        Some(Pending::X { .. }) => "x",
+                        None => "",
+                    }
                 ),
                 Style::new().fg(Color::Gray),
             ),
@@ -478,4 +623,107 @@ fn fit(s: &str, w: usize) -> String {
     out.push('…');
     out.push_str(&" ".repeat(w - used - 1));
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn app(tsv: &str) -> App {
+        let dir = env::temp_dir().join(format!("tsv-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = dir.join(format!("{n}.tsv"));
+        fs::write(&path, tsv).unwrap();
+        App::load(path).unwrap()
+    }
+
+    fn keys(app: &mut App, s: &str) {
+        for ch in s.chars() {
+            let code = match ch {
+                '\x1b' => KeyCode::Esc,
+                '\n' => KeyCode::Enter,
+                c => KeyCode::Char(c),
+            };
+            app.on_key(KeyEvent::new(code, KeyModifiers::NONE));
+        }
+    }
+
+    fn ctrl_r(app: &mut App) {
+        app.on_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL));
+    }
+
+    fn grid(app: &App) -> String {
+        app.rows.iter().map(|r| r.join("\t")).collect::<Vec<_>>().join("\n")
+    }
+
+    #[test]
+    fn tt_adds_column_right_of_cursor() {
+        let mut a = app("a\tb\n1\t2\n");
+        keys(&mut a, "tt");
+        assert_eq!(grid(&a), "a\t\tb\n1\t\t2");
+        assert_eq!(a.cur, (0, 1));
+        assert_eq!(a.widths.len(), 3);
+        keys(&mut a, "u");
+        assert_eq!(grid(&a), "a\tb\n1\t2");
+    }
+
+    #[test]
+    fn xx_deletes_column_and_undo_restores_it_in_one_step() {
+        let mut a = app("a\tb\tc\n1\t2\t3\n");
+        keys(&mut a, "lxx");
+        assert_eq!(grid(&a), "a\tc\n1\t3");
+        keys(&mut a, "u");
+        assert_eq!(grid(&a), "a\tb\tc\n1\t2\t3");
+        assert!(!a.dirty());
+        ctrl_r(&mut a);
+        assert_eq!(grid(&a), "a\tc\n1\t3");
+    }
+
+    #[test]
+    fn single_x_still_clears_the_cell() {
+        let mut a = app("a\tb\n1\t2\n");
+        keys(&mut a, "jxl");
+        assert_eq!(grid(&a), "a\tb\n\t2");
+        assert_eq!(a.cur, (1, 1));
+    }
+
+    #[test]
+    fn xx_refuses_the_only_column() {
+        let mut a = app("a\n1\n");
+        keys(&mut a, "xx");
+        assert_eq!(grid(&a), "a\n1");
+    }
+
+    #[test]
+    fn undo_redo_cells_and_rows() {
+        let mut a = app("a\tb\n1\t2\n");
+        keys(&mut a, "jihi\x1bo");
+        assert_eq!(grid(&a), "a\tb\nhi1\t2\n\t");
+        keys(&mut a, "uu");
+        assert_eq!(grid(&a), "a\tb\n1\t2");
+        keys(&mut a, "u");
+        assert_eq!(a.status, "already at oldest change");
+        ctrl_r(&mut a);
+        ctrl_r(&mut a);
+        assert_eq!(grid(&a), "a\tb\nhi1\t2\n\t");
+        keys(&mut a, "D");
+        keys(&mut a, "u");
+        assert_eq!(grid(&a), "a\tb\nhi1\t2\n\t");
+    }
+
+    #[test]
+    fn dirty_follows_undo_back_to_saved_state() {
+        let mut a = app("a\tb\n");
+        keys(&mut a, "tt");
+        assert!(a.dirty());
+        a.save();
+        assert!(!a.dirty());
+        keys(&mut a, "u");
+        assert!(a.dirty());
+        ctrl_r(&mut a);
+        assert!(!a.dirty());
+        let _ = fs::remove_file(&a.path);
+    }
 }

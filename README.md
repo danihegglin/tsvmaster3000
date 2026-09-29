@@ -25,6 +25,12 @@
 <img alt="runs in: your terminal" src="https://img.shields.io/badge/runs%20in-your%20terminal-bb9af7?style=for-the-badge&labelColor=161a2c">
 <img alt="keys: vim-style" src="https://img.shields.io/badge/keys-vim--style-2ac3de?style=for-the-badge&labelColor=161a2c&logo=vim&logoColor=c8d3f5">
 
+<br><br>
+
+<img src="docs/demo.gif" width="100%" alt="Demo: moving around people.tsv, editing a cell, adding a column with tt and naming it, deleting a column with xx, then undoing and redoing with u and Ctrl-R.">
+
+<sub>Recorded from <code>samples/people.tsv</code> with <a href="https://github.com/charmbracelet/vhs">vhs</a> using <code>docs/demo.tape</code>.</sub>
+
 </div>
 
 ---
@@ -35,6 +41,11 @@
   [ratatui](https://ratatui.rs). No window, no GPU, works over SSH.
 - **Vim-style keys.** `hjkl` to move, `i` / `a` to edit, `Esc` to commit,
   `:w` / `:q` / `:wq` to save and quit.
+- **Columns in two keystrokes.** `tt` adds a column to the right, `xx` deletes
+  the one you're on.
+- **Undo everything.** `u` and `Ctrl-R` undo and redo cell edits, rows and
+  columns alike, and the unsaved marker clears when you undo back to the saved
+  state.
 - **Readable at a glance.** Each column gets its own color, the first row is
   pinned as a header, and columns size themselves to their content (capped at
   48 characters, with `…` for anything longer).
@@ -83,6 +94,9 @@ A file argument is required.
 | `x` | clear the cell |
 | `o` | new row below |
 | `D` | delete the row (the header row can't be deleted) |
+| `tt` | add a column to the right |
+| `xx` | delete the column (the last remaining column can't be deleted) |
+| `u` / `Ctrl-R` | undo / redo |
 | `Ctrl-S` | save |
 | `q` | quit (refuses if there are unsaved changes) |
 | `Ctrl-C` | quit immediately, **discarding unsaved changes** |
@@ -113,4 +127,6 @@ A file argument is required.
 
 ```sh
 cargo build --release       # binary at target/release/tsv
+cargo test                  # tests that drive real key sequences
+vhs docs/demo.tape          # re-record the README demo (needs vhs and a release build)
 ```
