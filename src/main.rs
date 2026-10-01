@@ -5,7 +5,13 @@
 use std::{env, fs, io, path::PathBuf};
 
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    crossterm::{
+        event::{
+            self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
+            KeyModifiers,
+        },
+        execute,
+    },
     prelude::*,
     widgets::Paragraph,
     DefaultTerminal,
@@ -80,6 +86,8 @@ enum Change {
     DeleteRow { r: usize },
     InsertCol { c: usize, col: Vec<String> },
     DeleteCol { c: usize },
+    /// Several changes as one undo step; the cursor ends up on `at`.
+    Batch { at: (usize, usize), changes: Vec<Change> },
 }
 
 struct Entry {
@@ -128,7 +136,11 @@ fn main() -> io::Result<()> {
     };
     let mut app = App::load(PathBuf::from(arg))?;
     let mut terminal = ratatui::init();
+    // Terminal pastes then arrive as one `Event::Paste` instead of keystrokes.
+    // Not every terminal supports it; `p` reads the clipboard directly.
+    let _ = execute!(io::stdout(), EnableBracketedPaste);
     let res = app.run(&mut terminal);
+    let _ = execute!(io::stdout(), DisableBracketedPaste);
     ratatui::restore();
     res
 }
@@ -219,10 +231,10 @@ impl App {
     fn run(&mut self, term: &mut DefaultTerminal) -> io::Result<()> {
         while !self.quit {
             term.draw(|f| self.draw(f))?;
-            if let Event::Key(k) = event::read()? {
-                if k.kind == KeyEventKind::Press {
-                    self.on_key(k);
-                }
+            match event::read()? {
+                Event::Key(k) if k.kind == KeyEventKind::Press => self.on_key(k),
+                Event::Paste(text) => self.on_paste(&text),
+                _ => {}
             }
         }
         Ok(())
@@ -236,6 +248,28 @@ impl App {
             Mode::Insert => self.insert(k),
             Mode::Command => self.command(k),
             Mode::Filter => self.filter_key(k),
+        }
+    }
+
+    fn on_paste(&mut self, text: &str) {
+        match self.mode {
+            Mode::Normal => self.paste(text),
+            // Plain text goes in at the caret; anything with tabs or line
+            // breaks commits the cell and is pasted as a block from there.
+            Mode::Insert if text.contains(['\t', '\n', '\r']) => {
+                self.commit(0);
+                self.paste(text);
+            }
+            Mode::Insert => {
+                self.edit.insert_str(self.caret, text);
+                self.caret += text.len();
+            }
+            Mode::Command => self.cmd.push_str(text.lines().next().unwrap_or("")),
+            Mode::Filter => {
+                let mut query = self.filter.as_ref().map(|f| f.query.clone()).unwrap_or_default();
+                query.push_str(&text.replace(['\t', '\n', '\r'], " "));
+                self.set_filter(query);
+            }
         }
     }
 
@@ -317,6 +351,8 @@ impl App {
             KeyCode::Char('s') if ctrl => self.save(),
             KeyCode::Char('c') if ctrl => self.quit = true,
             KeyCode::Char('r') if ctrl => self.redo(),
+            KeyCode::Char('v') if ctrl => self.paste_clipboard(),
+            KeyCode::Char('p') => self.paste_clipboard(),
             KeyCode::Char('u') => self.undo(),
             KeyCode::Char('t') => self.pending = Some(Pending::T),
             KeyCode::Char('d') => self.pending = Some(Pending::D),
@@ -483,10 +519,20 @@ impl App {
 
     /// Apply `ch`, put the cursor on it, and return the change that undoes it.
     fn exec(&mut self, ch: Change) -> Change {
+        self.apply(ch, true)
+    }
+
+    /// `exec`, but with `remeasure` false the column widths may be left too
+    /// wide; a batch measures once at the end instead of after every cell.
+    fn apply(&mut self, ch: Change, remeasure: bool) -> Change {
         match ch {
             Change::SetCell { r, c, value } => {
                 let old = std::mem::replace(&mut self.rows[r][c], value);
-                self.measure(c);
+                if remeasure {
+                    self.measure(c);
+                } else {
+                    self.widths[c] = self.widths[c].max(self.rows[r][c].width().min(MAX_COL));
+                }
                 self.cur = (r, c);
                 Change::SetCell { r, c, value: old }
             }
@@ -500,7 +546,9 @@ impl App {
             }
             Change::DeleteRow { r } => {
                 let row = self.rows.remove(r);
-                self.measure_all();
+                if remeasure {
+                    self.measure_all();
+                }
                 self.cur.0 = r.min(self.rows.len() - 1);
                 Change::InsertRow { r, row }
             }
@@ -518,6 +566,13 @@ impl App {
                 self.widths.remove(c);
                 self.cur.1 = c.min(self.ncols() - 1);
                 Change::InsertCol { c, col }
+            }
+            Change::Batch { at, changes } => {
+                let mut undo: Vec<_> = changes.into_iter().map(|ch| self.apply(ch, false)).collect();
+                undo.reverse();
+                self.measure_all();
+                self.cur = (at.0.min(self.rows.len() - 1), at.1.min(self.ncols() - 1));
+                Change::Batch { at, changes: undo }
             }
         }
     }
@@ -583,6 +638,55 @@ impl App {
         } else {
             format!("deleted column {} ({name}) — u to undo", c + 1)
         };
+    }
+
+    fn paste_clipboard(&mut self) {
+        match arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+            Ok(text) => self.paste(&text),
+            Err(e) => self.status = format!("can't read the clipboard ({e}) — paste with your terminal instead"),
+        }
+    }
+
+    /// Paste TSV text over the grid with its top-left cell at the cursor,
+    /// adding rows and columns as needed. One undo step.
+    fn paste(&mut self, text: &str) {
+        let text = text.strip_suffix('\n').unwrap_or(text);
+        let text = text.strip_suffix('\r').unwrap_or(text);
+        if text.is_empty() {
+            self.status = "nothing to paste".into();
+            return;
+        }
+        let block: Vec<Vec<&str>> = text.lines().map(|l| l.split('\t').collect()).collect();
+        let height = block.len();
+        let width = block.iter().map(Vec::len).max().unwrap_or(1);
+        let (r0, c0) = self.cur;
+        // Hidden rows would be overwritten without you seeing it.
+        if height > 1 && self.filter.is_some() {
+            self.status = "clear the filter (Esc) to paste more than one row".into();
+            return;
+        }
+        let mut changes = Vec::new();
+        for c in self.ncols()..c0 + width {
+            changes.push(Change::InsertCol { c, col: vec![String::new(); self.rows.len()] });
+        }
+        let ncols = self.ncols().max(c0 + width);
+        for r in self.rows.len()..r0 + height {
+            changes.push(Change::InsertRow { r, row: vec![String::new(); ncols] });
+        }
+        for (dr, line) in block.iter().enumerate() {
+            for (dc, cell) in line.iter().enumerate() {
+                let (r, c) = (r0 + dr, c0 + dc);
+                if self.rows.get(r).and_then(|row| row.get(c)).map(String::as_str) != Some(*cell) {
+                    changes.push(Change::SetCell { r, c, value: (*cell).to_owned() });
+                }
+            }
+        }
+        if changes.is_empty() {
+            self.status = "pasted — no changes".into();
+            return;
+        }
+        self.record(Change::Batch { at: (r0, c0), changes });
+        self.status = format!("pasted {height} × {width} — u to undo");
     }
 
     fn begin_edit(&mut self, at_end: bool) {
@@ -1019,6 +1123,64 @@ mod tests {
         assert_eq!(a.cur, (0, 0));
         keys(&mut a, "!\x1b");
         assert_eq!(grid(&a), "a!\tb\nx1\t2\n3yz\t4");
+    }
+
+    #[test]
+    fn paste_overwrites_from_the_cursor_and_grows_the_grid() {
+        let mut a = app("a\tb\n1\t2\n");
+        keys(&mut a, "jl");
+        a.on_paste("x\ty\r\nz\r\n");
+        assert_eq!(grid(&a), "a\tb\t\n1\tx\ty\n\tz\t");
+        assert_eq!(a.cur, (1, 1));
+        assert!(a.dirty());
+        keys(&mut a, "u");
+        assert_eq!(grid(&a), "a\tb\n1\t2", "one undo step");
+        assert!(!a.dirty());
+        ctrl_r(&mut a);
+        assert_eq!(grid(&a), "a\tb\t\n1\tx\ty\n\tz\t");
+    }
+
+    #[test]
+    fn large_paste_is_fast() {
+        let mut a = app("");
+        let text: String = (0..20_000).map(|i| format!("{i}\ta\tb\tc\n")).collect();
+        let t = std::time::Instant::now();
+        a.on_paste(&text);
+        keys(&mut a, "u");
+        ctrl_r(&mut a);
+        assert_eq!(a.rows.len(), 20_000);
+        assert!(t.elapsed().as_secs() < 5, "took {:?}", t.elapsed());
+    }
+
+    #[test]
+    fn paste_into_an_empty_file_fills_it() {
+        let mut a = app("");
+        a.on_paste("name\tcity\nAna\tBern\n");
+        assert_eq!(grid(&a), "name\tcity\nAna\tBern");
+    }
+
+    #[test]
+    fn paste_while_editing() {
+        let mut a = app("a\tb\n1\t2\n");
+        keys(&mut a, "ja");
+        a.on_paste("23");
+        assert!(a.mode == Mode::Insert, "plain text goes in at the caret");
+        keys(&mut a, "\x1b");
+        assert_eq!(grid(&a), "a\tb\n123\t2");
+        keys(&mut a, "i");
+        a.on_paste("x\ty");
+        assert!(a.mode == Mode::Normal, "a block commits the cell and pastes");
+        assert_eq!(grid(&a), "a\tb\nx\ty");
+    }
+
+    #[test]
+    fn multi_row_paste_is_refused_while_filtering() {
+        let mut a = app("a\tb\n1\t2\n3\t4\n");
+        keys(&mut a, "/3\n");
+        a.on_paste("x\ny");
+        assert_eq!(grid(&a), "a\tb\n1\t2\n3\t4");
+        a.on_paste("x");
+        assert_eq!(grid(&a), "a\tb\n1\t2\nx\t4");
     }
 
     #[test]
