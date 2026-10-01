@@ -57,7 +57,13 @@
 
 ## ⚡ Install and run
 
-You need a recent stable [Rust toolchain](https://rustup.rs) and a terminal.
+You need a terminal.
+
+**Prebuilt binaries** for Linux (x86_64, arm64), macOS (Apple Silicon, Intel)
+and Windows (x86_64) are attached to each
+[GitHub release](https://github.com/danihegglin/tsvmaster3000/releases). Unpack
+the archive and put `tsv` (or `tsv.exe`) on your `PATH`. To build from source
+instead, you need a recent stable [Rust toolchain](https://rustup.rs).
 
 **Try it without installing:**
 
@@ -111,7 +117,8 @@ A file argument is required.
 | `Esc` | commit |
 | `Enter` | commit and move down |
 | `Tab` / `Shift-Tab` | commit and keep editing the cell to the right / left (`Tab` on the last column adds a new one) |
-| `←` `→` `Home` `End` | move the caret |
+| `↑` / `↓` | commit and keep editing the cell above / below |
+| `←` `→` `Home` `End` | move the caret within the cell |
 | `Backspace` / `Delete` | delete before / at the caret |
 
 | Filter | |
@@ -145,4 +152,13 @@ edit (or `o`) means it no longer matches, until you move off it.
 cargo build --release       # binary at target/release/tsv
 cargo test                  # tests that drive real key sequences
 vhs docs/demo.tape          # re-record the README demo (needs vhs and a release build)
+```
+
+CI (`.github/workflows/release.yml`) tests and packages every push and pull
+request for Linux, macOS and Windows; the archives are kept as workflow
+artifacts. Pushing a tag like `v0.2.0` also publishes them, with a
+`SHA256SUMS` file, as a GitHub release:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
 ```
