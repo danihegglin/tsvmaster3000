@@ -117,7 +117,8 @@ A file argument is required.
 | `Esc` | commit |
 | `Enter` | commit and move down |
 | `Tab` / `Shift-Tab` | commit and keep editing the cell to the right / left (`Tab` on the last column adds a new one) |
-| `←` `→` `Home` `End` | move the caret |
+| `↑` / `↓` | commit and keep editing the cell above / below |
+| `←` `→` `Home` `End` | move the caret within the cell |
 | `Backspace` / `Delete` | delete before / at the caret |
 
 | Filter | |
@@ -155,9 +156,9 @@ vhs docs/demo.tape          # re-record the README demo (needs vhs and a release
 
 CI (`.github/workflows/release.yml`) tests and packages every push and pull
 request for Linux, macOS and Windows; the archives are kept as workflow
-artifacts. Pushing a tag like `v0.1.0` also publishes them, with a
+artifacts. Pushing a tag like `v0.2.0` also publishes them, with a
 `SHA256SUMS` file, as a GitHub release:
 
 ```sh
-git tag v0.1.0 && git push origin v0.1.0
+git tag v0.2.0 && git push origin v0.2.0
 ```

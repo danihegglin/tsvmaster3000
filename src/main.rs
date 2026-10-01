@@ -393,6 +393,12 @@ impl App {
                 }
                 self.begin_edit(true);
             }
+            // Commit and keep editing the cell above / below.
+            KeyCode::Up | KeyCode::Down => {
+                self.commit(0);
+                self.move_to(if k.code == KeyCode::Up { -1 } else { 1 }, 0);
+                self.begin_edit(true);
+            }
             KeyCode::Char(c) => {
                 self.edit.insert(self.caret, c);
                 self.caret += c.len_utf8();
@@ -994,6 +1000,25 @@ mod tests {
         assert_eq!(grid(&a), "a\tb\nx1z\t2y");
         keys(&mut a, "u");
         assert_eq!(grid(&a), "a\tb\nx1\t2y", "each cell is its own undo step");
+    }
+
+    #[test]
+    fn arrows_keep_editing_the_cell_above_and_below() {
+        let mut a = app("a\tb\n1\t2\n3\t4\n");
+        keys(&mut a, "jix");
+        a.on_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+        assert!(a.mode == Mode::Insert);
+        assert_eq!(a.cur, (2, 0));
+        keys(&mut a, "y");
+        a.on_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+        assert_eq!(a.cur, (2, 0), "stays on the last row");
+        keys(&mut a, "z");
+        a.on_key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
+        a.on_key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
+        assert!(a.mode == Mode::Insert);
+        assert_eq!(a.cur, (0, 0));
+        keys(&mut a, "!\x1b");
+        assert_eq!(grid(&a), "a!\tb\nx1\t2\n3yz\t4");
     }
 
     #[test]
