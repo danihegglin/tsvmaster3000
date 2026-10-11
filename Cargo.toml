@@ -5,6 +5,7 @@ edition = "2021"
 description = "A fast TUI viewer/editor for TSV files"
 
 [dependencies]
+arboard = { version = "3.6.1", default-features = false }
 ratatui = "0.29"
 unicode-width = "0.2"
 

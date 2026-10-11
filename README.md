@@ -46,6 +46,9 @@
 - **Filter as you type.** `/` then a few words: rows that don't contain every
   word disappear, and the matching cells are highlighted so the hits stand
   out. `Enter` keeps the filter while you move and edit, `Esc` clears it.
+- **Paste from anywhere.** Copy cells from a spreadsheet or a TSV file and
+  paste them with your terminal (`Cmd-V`, `Ctrl-Shift-V`) or `p`. They land
+  at the cursor, the grid grows to fit, and `u` takes it all back.
 - **Undo everything.** `u` and `Ctrl-R` undo and redo cell edits, rows and
   columns alike, and the unsaved marker clears when you undo back to the saved
   state.
@@ -106,6 +109,7 @@ A file argument is required.
 | `tt` | add a column to the right |
 | `xx` | delete the column (the last remaining column can't be deleted) |
 | `u` / `Ctrl-R` | undo / redo |
+| `p` / `Ctrl-V` | paste TSV from the clipboard at the cursor (see below) |
 | `/` | filter rows (see below) |
 | `Esc` | clear the filter |
 | `Ctrl-S` | save |
@@ -137,6 +141,23 @@ edit (or `o`) means it no longer matches, until you move off it.
 | `:wq` / `:wq!` / `:x` | save and quit (if the save fails, it stays open) |
 | `:N` / `:$` | go to row N (the number in the left gutter) / the last row |
 | `:h` | show a key summary in the status line |
+
+### Pasting
+
+Pasted text is read as TSV: lines become rows and tabs separate cells. The
+block overwrites cells starting at the cursor, and rows and columns are added
+when it reaches past the edge. The whole paste is one undo step.
+
+- **Your terminal's paste** (`Cmd-V` on macOS, `Ctrl-Shift-V` on most Linux
+  terminals) works in every mode and also over SSH. While editing a cell,
+  plain text goes in at the caret; text with tabs or line breaks saves the
+  cell and is pasted as a block.
+- **`p` or `Ctrl-V`** in normal mode read the system clipboard directly. Use
+  it where the terminal's paste doesn't arrive as a block (for example the
+  classic Windows console). It needs a local desktop session: on Linux that is
+  X11 or XWayland.
+- While a filter is active only single-row pastes are allowed, so hidden rows
+  are never overwritten. `Esc` clears the filter.
 
 ## 📝 Good to know
 
