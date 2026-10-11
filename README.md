@@ -37,149 +37,71 @@
 
 ## ✦ What it does
 
-- **Lives in your terminal.** A single small binary built on
-  [ratatui](https://ratatui.rs). No window, no GPU, works over SSH.
-- **Vim-style keys.** `hjkl` to move, `i` / `a` to edit, `Esc` to commit,
-  `:w` / `:q` / `:wq` to save and quit.
-- **Columns in two keystrokes.** `tt` adds a column to the right, `xx` deletes
-  the one you're on.
-- **Filter as you type.** `/` then a few words: rows that don't contain every
-  word disappear, and the matching cells are highlighted so the hits stand
-  out. `Enter` keeps the filter while you move and edit, `Esc` clears it.
-- **Paste from anywhere.** Copy cells from a spreadsheet or a TSV file and
-  paste them with your terminal (`Cmd-V`, `Ctrl-Shift-V`) or `p`. They land
-  at the cursor, the grid grows to fit, and `u` takes it all back.
-- **Undo everything.** `u` and `Ctrl-R` undo and redo cell edits, rows and
-  columns alike, and the unsaved marker clears when you undo back to the saved
-  state.
-- **Readable at a glance.** Each column gets its own color, the first row is
-  pinned as a header, and columns size themselves to their content (capped at
-  48 characters, with `…` for anything longer).
-- **Knows where you are.** The status line shows the mode, file name, unsaved
-  marker, row and column, and the header name of the current column.
+- **Lives in your terminal.** One small binary built on
+  [ratatui](https://ratatui.rs). Works over SSH.
+- **Vim-style keys.** `hjkl` to move, `i` / `a` to edit, `:wq` to save and quit.
+- **Filter as you type.** `/` and a few words hides non-matching rows and
+  highlights the hits.
+- **Paste from anywhere.** Cells copied from a spreadsheet or TSV land at the
+  cursor and the grid grows to fit.
+- **Undo everything.** `u` / `Ctrl-R` cover cells, rows and columns.
+- **Readable at a glance.** A color per column, a pinned header row, and
+  columns sized to their content.
 
-## ⚡ Install and run
+## ⚡ Install
 
-You need a terminal.
-
-**Prebuilt binaries** for Linux (x86_64, arm64), macOS (Apple Silicon, Intel)
-and Windows (x86_64) are attached to each
-[GitHub release](https://github.com/danihegglin/tsvmaster3000/releases). Unpack
-the archive and put `tsv` (or `tsv.exe`) on your `PATH`. To build from source
-instead, you need a recent stable [Rust toolchain](https://rustup.rs).
-
-**Try it without installing:**
-
-```sh
-git clone https://github.com/danihegglin/tsvmaster3000.git
-cd tsvmaster3000
-cargo run --release -- samples/people.tsv
-```
-
-**Install the `tsv` command** (into `~/.cargo/bin`):
+Grab a prebuilt binary for Linux, macOS or Windows from the
+[releases](https://github.com/danihegglin/tsvmaster3000/releases) and put
+`tsv` on your `PATH`, or build it with a stable
+[Rust toolchain](https://rustup.rs):
 
 ```sh
 cargo install --git https://github.com/danihegglin/tsvmaster3000
-# or, from a clone:
-cargo install --path .
 ```
 
-**Run it:**
+Then:
 
 ```sh
-tsv data.tsv        # open a file
-tsv new.tsv         # a path that doesn't exist yet starts empty; :w creates it
+tsv data.tsv        # a path that doesn't exist yet starts empty; :w creates it
 ```
-
-A file argument is required.
 
 ## ⌨ Keys
 
 | Normal | |
 |---|---|
 | `h j k l`, arrows, `Tab` / `Shift-Tab` | move |
-| `Enter` | move down |
-| `PgUp` / `PgDn` | move 20 rows |
-| `g` / `G` | first / last row |
-| `0` / `$`, `Home` / `End` | first / last column |
+| `Enter` / `PgUp` / `PgDn` | move down / 20 rows up / 20 rows down |
+| `g` / `G`, `0` / `$` | first / last row, first / last column |
 | `i` / `a` | edit the cell (caret at start / end) |
 | `x` | clear the cell |
-| `o` | new row below |
-| `dd` / `D` | delete the row (the header row can't be deleted) |
-| `tt` | add a column to the right |
-| `xx` | delete the column (the last remaining column can't be deleted) |
+| `o` / `dd` | add a row below / delete the row (`D` also deletes; not the header) |
+| `tt` / `xx` | add a column to the right / delete the column |
 | `u` / `Ctrl-R` | undo / redo |
-| `p` / `Ctrl-V` | paste TSV from the clipboard at the cursor (see below) |
-| `/` | filter rows (see below) |
-| `Esc` | clear the filter |
-| `Ctrl-S` | save |
-| `q` | quit (refuses if there are unsaved changes) |
+| `p` / `Ctrl-V` | paste from the system clipboard |
+| `/` / `Esc` | filter rows / clear the filter |
+| `Ctrl-S` / `q` | save / quit (refuses with unsaved changes) |
 | `Ctrl-C` | quit immediately, **discarding unsaved changes** |
 
 | Insert | |
 |---|---|
-| `Esc` | commit |
-| `Enter` | commit and move down |
-| `Tab` / `Shift-Tab` | commit and keep editing the cell to the right / left (`Tab` on the last column adds a new one) |
-| `↑` / `↓` | commit and keep editing the cell above / below |
-| `←` `→` `Home` `End` | move the caret within the cell |
-| `Backspace` / `Delete` | delete before / at the caret |
-
-| Filter | |
-|---|---|
-| type | space-separated words; a row stays if every word appears in one of its cells, and cells containing a word are shown bold and underlined. Lowercase ignores case, any uppercase letter makes it case-sensitive |
-| `Enter` | keep the filter: `j` / `k`, `G` and paging skip hidden rows, and edits work as usual |
-| `Esc` | clear the filter |
-
-The header row always stays. The row the cursor is on stays visible even if an
-edit (or `o`) means it no longer matches, until you move off it.
+| `Esc` / `Enter` | commit / commit and move down |
+| `Tab` / `Shift-Tab`, `↑` / `↓` | commit and keep editing the next cell (`Tab` past the last column adds one) |
+| `←` `→` `Home` `End`, `Backspace` `Delete` | edit within the cell |
 
 | Command | |
 |---|---|
-| `:w` | save |
-| `:q` / `:q!` | quit / quit discarding changes |
-| `:wq` / `:wq!` / `:x` | save and quit (if the save fails, it stays open) |
-| `:N` / `:$` | go to row N (the number in the left gutter) / the last row |
-| `:h` | show a key summary in the status line |
+| `:w`, `:q`, `:q!`, `:wq`, `:x` | save / quit / discard and quit / save and quit |
+| `:N` / `:$` | go to row N (as in the gutter) / the last row |
+| `:h` | key summary in the status line |
 
-### Pasting
+**Filtering.** A row stays if every space-separated word appears in one of its
+cells. Lowercase ignores case; any uppercase letter makes it case-sensitive.
+`Enter` keeps the filter while you move and edit; the header and the row
+you're on always stay visible.
 
-Pasted text is read as TSV: lines become rows and tabs separate cells. The
-block overwrites cells starting at the cursor, and rows and columns are added
-when it reaches past the edge. The whole paste is one undo step.
-
-- **Your terminal's paste** (`Cmd-V` on macOS, `Ctrl-Shift-V` on most Linux
-  terminals) works in every mode and also over SSH. While editing a cell,
-  plain text goes in at the caret; text with tabs or line breaks saves the
-  cell and is pasted as a block.
-- **`p` or `Ctrl-V`** in normal mode read the system clipboard directly. Use
-  it where the terminal's paste doesn't arrive as a block (for example the
-  classic Windows console). It needs a local desktop session: on Linux that is
-  X11 or XWayland.
-- While a filter is active only single-row pastes are allowed, so hidden rows
-  are never overwritten. `Esc` clears the filter.
-
-## 📝 Good to know
-
-- The whole file is read into memory when it opens.
-- Short rows are padded with empty cells to the widest row, and the file is
-  saved with `\n` line endings and a trailing newline.
-- Tabs or newlines typed into a cell are saved as spaces, so the file stays
-  valid TSV.
-
-## 🛠 Building
-
-```sh
-cargo build --release       # binary at target/release/tsv
-cargo test                  # tests that drive real key sequences
-vhs docs/demo.tape          # re-record the README demo (needs vhs and a release build)
-```
-
-CI (`.github/workflows/release.yml`) tests and packages every push and pull
-request for Linux, macOS and Windows; the archives are kept as workflow
-artifacts. Pushing a tag like `v0.2.0` also publishes them, with a
-`SHA256SUMS` file, as a GitHub release:
-
-```sh
-git tag v0.2.0 && git push origin v0.2.0
-```
+**Pasting.** Lines become rows and tabs separate cells; the block overwrites
+from the cursor as a single undo step. Your terminal's paste (`Cmd-V`,
+`Ctrl-Shift-V`) works in every mode, including over SSH. `p` / `Ctrl-V` read
+the clipboard directly for terminals where that doesn't work, and need a local
+desktop session (X11 or XWayland on Linux). While filtering, only single-row
+pastes are allowed.
